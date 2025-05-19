@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "QgHTDxxRG74=",
+  "dgSpecHash": "jGW6CJ1yN1g=",
   "success": true,
-  "projectFilePath": "C:\\Users\\frede\\RiderProjects\\4thsemesterexam\\backend\\backend.csproj",
+  "projectFilePath": "C:\\Users\\frede\\Desktop\\examproject\\fourthsemesterexam\\backend\\backend.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\frede\\.nuget\\packages\\hivemqtt\\0.26.1\\hivemqtt.0.26.1.nupkg.sha512",
     "C:\\Users\\frede\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\8.0.1\\microsoft.extensions.dependencyinjection.abstractions.8.0.1.nupkg.sha512",

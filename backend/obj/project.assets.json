@@ -457,11 +457,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\frede\\RiderProjects\\4thsemesterexam\\backend\\backend.csproj",
+      "projectUniqueName": "C:\\Users\\frede\\Desktop\\examproject\\fourthsemesterexam\\backend\\backend.csproj",
       "projectName": "backend",
-      "projectPath": "C:\\Users\\frede\\RiderProjects\\4thsemesterexam\\backend\\backend.csproj",
+      "projectPath": "C:\\Users\\frede\\Desktop\\examproject\\fourthsemesterexam\\backend\\backend.csproj",
       "packagesPath": "C:\\Users\\frede\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\frede\\RiderProjects\\4thsemesterexam\\backend\\obj\\",
+      "outputPath": "C:\\Users\\frede\\Desktop\\examproject\\fourthsemesterexam\\backend\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\frede\\AppData\\Roaming\\NuGet\\NuGet.Config"

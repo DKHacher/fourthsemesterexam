@@ -10,7 +10,7 @@ var options = new HiveMQClientOptionsBuilder().
     WithBroker("localhost").//set to localhost, i might just decide to use one of the free online brokers for this part as i cant seem to get it to work correctly
     //another option is to change this out for a websocket server
     WithPort(1883). //port 8883 default i think for connecting to the free online broker, use port 1883 if using local docker as that is default
-    WithUseTls(true).// it seems like this is what is holding me back from continuing further, but i cant remember how to add credentials so it passes
+    WithUseTls(false).// it seems like this is what is holding me back from continuing further, but i cant remember how to add credentials so it passes
     Build();
 var client = new HiveMQClient(options);
 
