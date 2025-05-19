@@ -5,6 +5,18 @@ using HiveMQtt.MQTT5.Types;
 //most of this code is taken from the HiveMQTT example and used as provided, but they set it up to connect directly to a cloud based broker from their own services,
 //this has been changed to a local version for now
 
+
+//This commented out part is where i add a db context based on the database
+//var builder = WebApplication.CreateBuilder(args);  
+
+//builder.Services.AddDbContext<Db>((provider, optionsBuilder) =>
+//{
+//    optionsBuilder.UseSqlite("Data Source=db.sqlite");
+//} );
+//var app = builder.Build();
+//var logger = app.Services.GetRequiredService<ILogger<string>>();
+
+
 // Setup Client options and instantiate
 var options = new HiveMQClientOptionsBuilder().
     WithBroker("localhost").//seems to work fine for now, but if i want to work on the fullstack aspects of this later, then i might have to convert to a websocket based connection
@@ -27,6 +39,12 @@ var subscribeOptionsBuilder =
     new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery),
         (obj, e) => //Currently commented out as i am missing a dbcontext for the database and subsequent functions, Replace TimeseriesData with XXXXXXData
         {
+            //will need to tweak this part, as i have two seperate buisness entities for the data to go through, one as a received version, and the version that needs to be sent out
+            
+            //things to look into, receive data as BE 1 which includes a picture, convert as much to BE2, add timestamp,
+            //run process to add picture to filesystem that is to be used, maybe use Google Pictures on my own account
+            //then look into adding link to newly saved picture to BE2 before sending it to database and process is done
+            
             //logger.LogInformation(JsonSerializer.Serialize(e.PublishMessage.PayloadAsString)); //potential logger
             //var data = JsonSerializer.Deserialize<XXXXXXXData>(e.PublishMessage.PayloadAsString); //Replace XXXXXXXData with a set of rules like Id[key], FileLink/Serialized image, Device Id and Timestamp, Possibly More
             //using (var scope = app.Services.CreateScope())
@@ -48,3 +66,5 @@ var subscribeResult = await client.SubscribeAsync(subscribeOptions);
 
 // Publish a message
 var publishResult = await client.PublishAsync("topic1/example", "Hello Payload");
+
+//maybe inclue an App.Run here once the above parts are not commented out
