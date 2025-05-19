@@ -1,20 +1,17 @@
-﻿using HiveMQtt.Client;
+﻿using System.Text.Json;
+using HiveMQtt.Client;
 using HiveMQtt.MQTT5.Types;
 
-// command to setup local docker broker: docker run --name hivemq-ce -d -p 1883:1883 hivemq/hivemq-ce
-
-//most of this code is taken from the HiveMQTT example and used as provided, but they set it up to connect directly to a cloud based broker from their own services
+//most of this code is taken from the HiveMQTT example and used as provided, but they set it up to connect directly to a cloud based broker from their own services,
+//this has been changed to a local version for now
 
 // Setup Client options and instantiate
 var options = new HiveMQClientOptionsBuilder().
-    WithBroker("localhost").//set to localhost, i might just decide to use one of the free online brokers for this part as i cant seem to get it to work correctly
-    //another option is to change this out for a websocket server
-    WithPort(1883). //port 8883 default i think for connecting to the free online broker, use port 1883 if using local docker as that is default
-    WithUseTls(false).// it seems like this is what is holding me back from continuing further, but i cant remember how to add credentials so it passes
+    WithBroker("localhost").//seems to work fine for now, but if i want to work on the fullstack aspects of this later, then i might have to convert to a websocket based connection
+    WithPort(1883). 
+    WithUseTls(false).//tls is turned off for testing locally, but i would have to change it to be on and figure out another way to work with it, once 
     Build();
 var client = new HiveMQClient(options);
-
-//have not touched anything past here, ast i need the above part to work to be able to test these parts
 
 // Setup an application message handlers BEFORE subscribing to a topic
 client.OnMessageReceived += (sender, args) =>
@@ -26,10 +23,27 @@ client.OnMessageReceived += (sender, args) =>
 var connectResult = await client.ConnectAsync().ConfigureAwait(false);
 
 // Configure the subscriptions we want and subscribe
-var builder = new SubscribeOptionsBuilder();
-builder.WithSubscription("topic1", QualityOfService.AtLeastOnceDelivery)
-    .WithSubscription("topic2", QualityOfService.ExactlyOnceDelivery);
-var subscribeOptions = builder.Build();
+var subscribeOptionsBuilder =
+    new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery),
+        (obj, e) => //Currently commented out as i am missing a dbcontext for the database and subsequent functions, Replace TimeseriesData with XXXXXXData
+        {
+            //logger.LogInformation(JsonSerializer.Serialize(e.PublishMessage.PayloadAsString)); //potential logger
+            //var data = JsonSerializer.Deserialize<XXXXXXXData>(e.PublishMessage.PayloadAsString); //Replace XXXXXXXData with a set of rules like Id[key], FileLink/Serialized image, Device Id and Timestamp, Possibly More
+            //using (var scope = app.Services.CreateScope())
+            //{
+            //    var db = scope.ServiceProvider.GetRequiredService<Db>();
+            //    db .TimeseriesData.Add(data);
+            //    db.SaveChanges();
+            //    logger.LogInformation("Now the database has the follwing data in the timeseries table: ");
+            //    foreach (var d in db.TimeseriesData)
+            //    {
+            //        logger.LogInformation(JsonSerializer.Serialize(d));
+            //    }
+            //}
+        }
+    );
+    
+var subscribeOptions = subscribeOptionsBuilder.Build();
 var subscribeResult = await client.SubscribeAsync(subscribeOptions);
 
 // Publish a message
