@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "dgSpecHash": "QgHTDxxRG74=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\frede\\RiderProjects\\4thsemesterexam\\backend\\backend.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\frede\\.nuget\\packages\\hivemqtt\\0.26.1\\hivemqtt.0.26.1.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\8.0.1\\microsoft.extensions.dependencyinjection.abstractions.8.0.1.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\8.0.1\\microsoft.extensions.logging.abstractions.8.0.1.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\microsoft.io.recyclablememorystream\\3.0.0\\microsoft.io.recyclablememorystream.3.0.0.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\nlog\\5.2.3\\nlog.5.2.3.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\system.io.pipelines\\7.0.0\\system.io.pipelines.7.0.0.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\system.reactive\\6.0.0\\system.reactive.6.0.0.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\system.threading.channels\\8.0.0\\system.threading.channels.8.0.0.nupkg.sha512",
+    "C:\\Users\\frede\\.nuget\\packages\\websocket.client\\5.1.2\\websocket.client.5.1.2.nupkg.sha512"
+  ],
+  "logs": []
+}
