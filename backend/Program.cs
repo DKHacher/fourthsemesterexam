@@ -1,22 +1,28 @@
 ﻿using System.Text.Json;
 using backend;
+using backend.Context;
+using backend.Entities;
 using HiveMQtt.Client;
 using HiveMQtt.MQTT5.Types;
+using Microsoft.EntityFrameworkCore;
+
 
 //most of this code is taken from the HiveMQTT example and used as provided, but they set it up to connect directly to a cloud based broker from their own services,
 //this has been changed to a local version for now
 
 
 //This commented out part is where i add a db context based on the database i think
-//var builder = WebApplication.CreateBuilder(args);  
+var builder = WebApplication.CreateBuilder(args);  
 
 
-builder.Services.AddEntityFrameworkNpgsql().AddDbContext<AppDbContext>(opt =>
+builder.Services.AddEntityFrameworkNpgsql().AddDbContext<MyDbContext>(opt =>
 {
-    opt.UseNpgsql(configuration.GetConnectionString("PgDbConnection"));
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("PgDbConnection"));
 });
-//var app = builder.Build();
-//var logger = app.Services.GetRequiredService<ILogger<string>>();
+
+
+var app = builder.Build();
+var logger = app.Services.GetRequiredService<ILogger<string>>();
 
 
 // Setup Client options and instantiate
@@ -27,7 +33,7 @@ var options = new HiveMQClientOptionsBuilder().
     Build();
 var client = new HiveMQClient(options);
 
-// Setup an application message handlers BEFORE subscribing to a topic
+// Setup an application message handlers BEFORE subscribing to a topic, maybe is should move the process from the subscribe options builder up here
 client.OnMessageReceived += (sender, args) =>
 {
     Console.WriteLine("Message Received: {}", args.PublishMessage.PayloadAsString);
@@ -39,7 +45,7 @@ var connectResult = await client.ConnectAsync().ConfigureAwait(false);
 // Configure the subscriptions we want and subscribe
 var subscribeOptionsBuilder =
     new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery),
-        (obj, e) => //Currently commented out as i am missing a dbcontext for the database and subsequent functions, Replace TimeseriesData with XXXXXXData
+        (obj, e) => 
         {
             //will need to tweak this part, as i have two seperate buisness entities for the data to go through, one as a received version, and the version that needs to be sent out
             
@@ -47,19 +53,20 @@ var subscribeOptionsBuilder =
             //run process to add picture to filesystem that is to be used, maybe use Google Pictures on my own account
             //then look into adding link to newly saved picture to BE2 before sending it to database and process is done
             
-            //logger.LogInformation(JsonSerializer.Serialize(e.PublishMessage.PayloadAsString)); //potential logger
-            var data = JsonSerializer.Deserialize<ReceivedData>(e.PublishMessage.PayloadAsString); //Replace XXXXXXXData with a set of rules like Id[key], FileLink/Serialized image, Device Id and Timestamp, Possibly More
-            //using (var scope = app.Services.CreateScope())
-            //{
-            //    var db = scope.ServiceProvider.GetRequiredService<Db>();
-            //    db .TimeseriesData.Add(data);
-            //    db.SaveChanges();
-            //    logger.LogInformation("Now the database has the follwing data in the timeseries table: ");
-            //    foreach (var d in db.TimeseriesData)
-            //    {
-            //        logger.LogInformation(JsonSerializer.Serialize(d));
-            //    }
-            //}
+            logger.LogInformation(JsonSerializer.Serialize(e.PublishMessage.PayloadAsString)); //potential logger
+            var data = JsonSerializer.Deserialize<ReceivedData>(e.PublishMessage.PayloadAsString); 
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+                var transformedData = new Storeddatum(){Id = data.Id, Deviceid = data.DeviceId, Date = DateTime.Now, Linktopicture = "Testlink"};//replace testlink with actual link, and feature to create link
+                db.Storeddata.Add(transformedData);
+                db.SaveChanges();
+                logger.LogInformation("Now the database has the follwing data in the StoredData table: ");
+                foreach (var d in db.Storeddata)
+                {
+                    logger.LogInformation(JsonSerializer.Serialize(d));
+                }
+            }
         }
     );
     
