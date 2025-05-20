@@ -36,7 +36,7 @@ var client = new HiveMQClient(options);
 // Setup an application message handlers BEFORE subscribing to a topic, maybe is should move the process from the subscribe options builder up here
 client.OnMessageReceived += (sender, args) =>
 {
-    Console.WriteLine("Message Received: {}", args.PublishMessage.PayloadAsString);
+    Console.WriteLine($"Message Received: {args.PublishMessage.PayloadAsString}");
 };
 
 // Connect to the MQTT broker
@@ -54,27 +54,34 @@ var subscribeOptionsBuilder =
             //then look into adding link to newly saved picture to BE2 before sending it to database and process is done
             
             logger.LogInformation(JsonSerializer.Serialize(e.PublishMessage.PayloadAsString)); //potential logger
-            var data = JsonSerializer.Deserialize<ReceivedData>(e.PublishMessage.PayloadAsString); 
-            using (var scope = app.Services.CreateScope())
+            try
             {
-                var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
-                var transformedData = new Storeddatum(){Id = data.Id, Deviceid = data.DeviceId, Date = DateTime.Now, Linktopicture = "Testlink"};//replace testlink with actual link, and feature to create link
-                db.Storeddata.Add(transformedData);
-                db.SaveChanges();
-                logger.LogInformation("Now the database has the follwing data in the StoredData table: ");
-                foreach (var d in db.Storeddata)
+                var data = JsonSerializer.Deserialize<ReceivedData>(e.PublishMessage.PayloadAsString); 
+                using (var scope = app.Services.CreateScope())
                 {
-                    logger.LogInformation(JsonSerializer.Serialize(d));
+                    var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+                    var transformedData = new Storeddatum(){Id = data.Id, Deviceid = data.DeviceId, Date = DateTime.Now, Linktopicture = "Testlink"};//replace testlink with actual link, and feature to create link
+                    db.Storeddata.Add(transformedData);
+                    db.SaveChanges();
+                    logger.LogInformation("Now the database has the follwing data in the StoredData table: ");
+                    foreach (var d in db.Storeddata)
+                    {
+                        logger.LogInformation(JsonSerializer.Serialize(d));
+                    }
                 }
+            }
+            catch (JsonException ex)
+            {
+                logger.LogError(ex, "Failed to deserialize payload: " + e.PublishMessage.PayloadAsString);
             }
         }
     );
     
 var subscribeOptions = subscribeOptionsBuilder.Build();
 var subscribeResult = await client.SubscribeAsync(subscribeOptions);
-
+var testData = new ReceivedData() { Id= "0", DeviceId = "0", Data = "Hello World" };
 // Publish a message
-var publishResult = await client.PublishAsync("topic1/example", "Hello Payload");
+var publishResult = await client.PublishAsync("topic1", JsonSerializer.Serialize(testData));
 
 
 //maybe inclue an App.Run here once the above parts are not commented out
