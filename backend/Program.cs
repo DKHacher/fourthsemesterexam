@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using backend;
 using HiveMQtt.Client;
 using HiveMQtt.MQTT5.Types;
 
@@ -6,13 +7,14 @@ using HiveMQtt.MQTT5.Types;
 //this has been changed to a local version for now
 
 
-//This commented out part is where i add a db context based on the database
+//This commented out part is where i add a db context based on the database i think
 //var builder = WebApplication.CreateBuilder(args);  
 
-//builder.Services.AddDbContext<Db>((provider, optionsBuilder) =>
-//{
-//    optionsBuilder.UseSqlite("Data Source=db.sqlite");
-//} );
+
+builder.Services.AddEntityFrameworkNpgsql().AddDbContext<AppDbContext>(opt =>
+{
+    opt.UseNpgsql(configuration.GetConnectionString("PgDbConnection"));
+});
 //var app = builder.Build();
 //var logger = app.Services.GetRequiredService<ILogger<string>>();
 
@@ -46,7 +48,7 @@ var subscribeOptionsBuilder =
             //then look into adding link to newly saved picture to BE2 before sending it to database and process is done
             
             //logger.LogInformation(JsonSerializer.Serialize(e.PublishMessage.PayloadAsString)); //potential logger
-            //var data = JsonSerializer.Deserialize<XXXXXXXData>(e.PublishMessage.PayloadAsString); //Replace XXXXXXXData with a set of rules like Id[key], FileLink/Serialized image, Device Id and Timestamp, Possibly More
+            var data = JsonSerializer.Deserialize<ReceivedData>(e.PublishMessage.PayloadAsString); //Replace XXXXXXXData with a set of rules like Id[key], FileLink/Serialized image, Device Id and Timestamp, Possibly More
             //using (var scope = app.Services.CreateScope())
             //{
             //    var db = scope.ServiceProvider.GetRequiredService<Db>();
@@ -66,5 +68,6 @@ var subscribeResult = await client.SubscribeAsync(subscribeOptions);
 
 // Publish a message
 var publishResult = await client.PublishAsync("topic1/example", "Hello Payload");
+
 
 //maybe inclue an App.Run here once the above parts are not commented out
