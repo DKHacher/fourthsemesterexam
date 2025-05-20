@@ -14,6 +14,17 @@ using Microsoft.EntityFrameworkCore;
 //This commented out part is where i add a db context based on the database i think
 var builder = WebApplication.CreateBuilder(args);  
 
+//LEAVING CODE that is to be tested
+var generator = new CloudinaryService.CloudinarySignedUrlGenerator(
+    "your_cloud_name",
+    "your_api_key",
+    "your_api_secret"
+);
+
+string signedUrl = generator.GenerateAuthenticatedImageUrl("doorbell_images/my_image_id");
+
+Console.WriteLine("Signed URL: " + signedUrl);
+//END OF CODE that is to be tested
 
 builder.Services.AddEntityFrameworkNpgsql().AddDbContext<MyDbContext>(opt =>
 {
