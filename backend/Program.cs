@@ -1,98 +1,122 @@
 ﻿using System.Text.Json;
 using backend;
 using backend.Context;
-using backend.Entities;
 using HiveMQtt.Client;
 using HiveMQtt.MQTT5.Types;
 using Microsoft.EntityFrameworkCore;
 
 
-//most of this code is taken from the HiveMQTT example and used as provided, but they set it up to connect directly to a cloud based broker from their own services,
-//this has been changed to a local version for now
 
+var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("PgDbConnection");
+Console.WriteLine($"[DEBUG] Connection string: {connectionString}");
+builder.Services.AddDbContextFactory<MyDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("PgDbConnection")));
+builder.Services.AddControllers();
+Console.WriteLine("Connection string: " + builder.Configuration.GetConnectionString("PgDbConnection"));
 
-//This commented out part is where i add a db context based on the database i think
-var builder = WebApplication.CreateBuilder(args);  
-
-//LEAVING CODE that is to be tested
-var generator = new CloudinaryService.CloudinarySignedUrlGenerator(
-    "your_cloud_name",
-    "your_api_key",
-    "your_api_secret"
-);
-
-string signedUrl = generator.GenerateAuthenticatedImageUrl("doorbell_images/my_image_id");
-
-Console.WriteLine("Signed URL: " + signedUrl);
-//END OF CODE that is to be tested
-
-builder.Services.AddEntityFrameworkNpgsql().AddDbContext<MyDbContext>(opt =>
-{
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("PgDbConnection"));
-});
-
-
+//var cloudinaryService = new CloudinaryService("", "", "");//replace blanks with github secrets
+builder.Services.AddScoped<StorageService>();
+builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
+builder.Services.AddScoped<CloudinaryService>();
+builder.Services.AddLogging();
 var app = builder.Build();
-var logger = app.Services.GetRequiredService<ILogger<string>>();
+app.MapControllers();
 
 
 // Setup Client options and instantiate
 var options = new HiveMQClientOptionsBuilder().
-    WithBroker("localhost").//seems to work fine for now, but if i want to work on the fullstack aspects of this later, then i might have to convert to a websocket based connection
+    WithBroker("host.docker.internal").
     WithPort(1883). 
-    WithUseTls(false).//tls is turned off for testing locally, but i would have to change it to be on and figure out another way to work with it, once 
+    WithUseTls(false).//tls is turned off for testing locally, but i would have to change it to be on and figure out another way to work with it, once i send it to cloud probably
     Build();
 var client = new HiveMQClient(options);
 
-// Setup an application message handlers BEFORE subscribing to a topic, maybe is should move the process from the subscribe options builder up here
-client.OnMessageReceived += (sender, args) =>
+var retries = 3;
+var delay = TimeSpan.FromSeconds(5);
+
+for (int i = 0; i < retries; i++)
 {
-    Console.WriteLine($"Message Received: {args.PublishMessage.PayloadAsString}");
+    try
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<MyDbContext>>();
+            using var db = await dbFactory.CreateDbContextAsync();
+            await db.Database.MigrateAsync();
+        }
+        break; // success
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"DB not ready yet ({i + 1}/{retries}): {ex.Message}");
+        if (i == retries - 1) throw;
+        await Task.Delay(delay);
+    }
+}
+
+// Setup an application message handlers BEFORE subscribing to a topic
+client.OnMessageReceived += async (sender, args) =>
+{
+    using var scope = app.Services.CreateScope();
+    var storageService = scope.ServiceProvider.GetRequiredService<StorageService>();
+    var cloudinaryService = scope.ServiceProvider.GetRequiredService<CloudinaryService>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var rawPayload = args.PublishMessage.PayloadAsString;
+        var data = JsonSerializer.Deserialize<ReceivedData>(rawPayload);
+
+        // Decode base64 image
+        byte[] imageBytes = Convert.FromBase64String(data.Data);
+        using var imageStream = new MemoryStream(imageBytes);
+
+        // Upload to Cloudinary
+        var publicId = await cloudinaryService.UploadPrivateImageAsync(
+            imageStream,
+            $"{data.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg");
+
+        // Store metadata in DB
+        await storageService.StoreMetadataAsync(data.DeviceId, publicId);
+
+        logger.LogInformation($"Image uploaded and metadata stored for device {data.DeviceId}.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to handle incoming MQTT message.");
+    }
 };
+
 
 // Connect to the MQTT broker
 var connectResult = await client.ConnectAsync().ConfigureAwait(false);
 
 // Configure the subscriptions we want and subscribe
-var subscribeOptionsBuilder =
-    new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery),
-        (obj, e) => 
-        {
-            //will need to tweak this part, as i have two seperate buisness entities for the data to go through, one as a received version, and the version that needs to be sent out
-            
-            //things to look into, receive data as BE 1 which includes a picture, convert as much to BE2, add timestamp,
-            //run process to add picture to filesystem that is to be used, maybe use Google Pictures on my own account
-            //then look into adding link to newly saved picture to BE2 before sending it to database and process is done
-            
-            logger.LogInformation(JsonSerializer.Serialize(e.PublishMessage.PayloadAsString)); //potential logger
-            try
-            {
-                var data = JsonSerializer.Deserialize<ReceivedData>(e.PublishMessage.PayloadAsString); 
-                using (var scope = app.Services.CreateScope())
-                {
-                    var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
-                    var transformedData = new Storeddatum(){Id = data.Id, Deviceid = data.DeviceId, Date = DateTime.Now, Linktopicture = "Testlink"};//replace testlink with actual link, and feature to create link
-                    db.Storeddata.Add(transformedData);
-                    db.SaveChanges();
-                    logger.LogInformation("Now the database has the follwing data in the StoredData table: ");
-                    foreach (var d in db.Storeddata)
-                    {
-                        logger.LogInformation(JsonSerializer.Serialize(d));
-                    }
-                }
-            }
-            catch (JsonException ex)
-            {
-                logger.LogError(ex, "Failed to deserialize payload: " + e.PublishMessage.PayloadAsString);
-            }
-        }
-    );
+var subscribeOptionsBuilder = new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery));
     
 var subscribeOptions = subscribeOptionsBuilder.Build();
 var subscribeResult = await client.SubscribeAsync(subscribeOptions);
-var testData = new ReceivedData() { Id= "0", DeviceId = "0", Data = "Hello World" };
-// Publish a message
-var publishResult = await client.PublishAsync("topic1", JsonSerializer.Serialize(testData));
 
+var imagePath = Path.Combine(AppContext.BaseDirectory, "ImageToTest.jpg");
+if (!File.Exists(imagePath))
+{
+    Console.WriteLine($"Image not found at {imagePath}");
+}
+else
+{
+    byte[] imageBytes = await File.ReadAllBytesAsync(imagePath);
+    string base64Image = Convert.ToBase64String(imageBytes);
 
-//maybe inclue an App.Run here once the above parts are not commented out
+    var testData = new ReceivedData()
+    {
+        Id = "0",
+        DeviceId = "test-device-001",
+        Data = base64Image
+    };
+
+    var publishResult = await client.PublishAsync("topic1", JsonSerializer.Serialize(testData));
+    Console.WriteLine($"Published test image to MQTT topic. Result: {publishResult.ReasonCode}");
+}
+app.Run();
+//maybe inclue an App.Run here once the above parts are not commented out dont know why i need to yet

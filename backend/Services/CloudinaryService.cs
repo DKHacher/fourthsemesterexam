@@ -2,17 +2,20 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web;
+using backend;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using Microsoft.Extensions.Options;
 
 
 public class CloudinaryService
 {
     private readonly Cloudinary _cloudinary;
 
-    public CloudinaryService(string cloudName, string apiKey, string apiSecret)
+    public CloudinaryService(IOptions<CloudinarySettings> options)
     {
-        var account = new Account(cloudName, apiKey, apiSecret);
+        var settings = options.Value;
+        var account = new Account(settings.CloudName, settings.ApiKey, settings.ApiSecret);
         _cloudinary = new Cloudinary(account);
     }
 

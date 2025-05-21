@@ -1,0 +1,31 @@
+﻿# Ignore version control
+.git
+.gitignore
+.vscode
+.idea
+.vs
+
+# Ignore build and IDE files
+bin/
+obj/
+*.user
+*.dbmdl
+*.jfm
+*.project
+*.settings
+*.toolstarget
+
+# Ignore Node/npm artifacts
+node_modules/
+npm-debug.log
+
+# Azure / Helm
+azds.yaml
+charts/
+secrets.dev.yaml
+values.dev.yaml
+
+# Keep Docker & config files!
+# Do NOT ignore Dockerfile, docker-compose, appsettings.json, etc.
+**/Dockerfile*
+**/docker-compose*

@@ -9,5 +9,20 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: ./  # or ./backend if Dockerfile is there
+      dockerfile: Dockerfile
+    env_file:
+      - ./local.env
+    ports:
+      - "5000:80"  # match app container's default ASP.NET Core port
+    environment:
+      - ASPNETCORE_URLS=http://+:80
+    depends_on:
+      - db
+
+
 volumes:
   postgres_data:
