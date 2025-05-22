@@ -13,13 +13,36 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+
+      - name: SSH - Clean up existing docker containers & volumes
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.CLOUD_SERVER_IP }}
+          username: ${{ secrets.CLOUD_USER }}
+          key: ${{ secrets.CLOUD_SSH_KEY }}
+          script: |
+            cd ~/my-iot-app/backend
+            # stops all containers
+            docker compose -f docker-compose.yaml stop || true
+            
+            sleep 10
+            # remove all containers currently not used as it would slow down the process but is left in in case of issues
+            # docker compose -f docker-compose.yaml rm -f || true
+            
+            # Optional: prune unused volumes (be careful in production) currently not used
+            # docker volume prune -f || true
+            
+            # Optional: prune unused images and networks
+            # docker system prune -f || true
+
+
       - name: Copy project files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.CLOUD_SERVER_IP }}
           username: ${{ secrets.CLOUD_USER }}
           key: ${{ secrets.CLOUD_SSH_KEY }}
-          source: "."  # Adjust to only what's needed if project is big
+          source: "."
           target: "my-iot-app/"
           rm: true
 
@@ -31,10 +54,8 @@ jobs:
           username: ${{ secrets.CLOUD_USER }}
           key: ${{ secrets.CLOUD_SSH_KEY }}
           script: |
-            cd my-iot-app
-            cd backend
-            
-            # Export secrets into current shell so docker-compose can use them
+            cd ~/my-iot-app/backend
+
             export POSTGRES_USER="${{ secrets.POSTGRES_USER }}"
             export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
             export POSTGRES_DB="${{ secrets.POSTGRES_DB }}"
@@ -42,7 +63,7 @@ jobs:
             export CLOUDINARY_CLOUDNAME="${{ secrets.CLOUDINARY_CLOUDNAME }}"
             export CLOUDINARY_APIKEY="${{ secrets.CLOUDINARY_APIKEY }}"
             export CLOUDINARY_APISECRET="${{ secrets.CLOUDINARY_APISECRET }}"
-            
-            docker compose down -v --remove-orphans || true
-            docker compose build --no-cache
-            docker compose up --build
+
+            docker compose -f docker-compose.yaml build --no-cache
+            docker compose -f docker-compose.yaml up --build -d
+      
