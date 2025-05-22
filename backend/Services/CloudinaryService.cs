@@ -28,7 +28,7 @@ public class CloudinaryService
             UniqueFilename = false,
             Overwrite = true,
             Folder = "doorbell_images",
-            Type = "authenticated"  // This will create an authenticated URL for the image
+            Type = "authenticated"
         };
 
         var uploadResult = await _cloudinary.UploadAsync(uploadParams);
@@ -37,9 +37,13 @@ public class CloudinaryService
         {
             return uploadResult.PublicId; // Save this in DB
         }
-
-        throw new Exception("Image upload failed.");
+        else
+        {
+            var errorMessage = uploadResult.Error?.Message ?? "Unknown error";
+            throw new Exception($"Image upload failed: {errorMessage}");
+        }
     }
+
 
     public class CloudinarySignedUrlGenerator
     {
