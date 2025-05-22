@@ -20,6 +20,5 @@ EXPOSE 80
 EXPOSE 443
 
 COPY --from=publish /app/publish .
-COPY ImageToTest.jpg ./
 
 ENTRYPOINT ["dotnet", "backend.dll"]
