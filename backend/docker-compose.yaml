@@ -9,7 +9,14 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
+    
+  mqtt:
+    image: hivemq/hivemq4
+    ports:
+      - "1883:1883"    # MQTT protocol
+      - "8080:8080"    # HiveMQ Web UI (optional)
+    restart: unless-stopped
+    
   app:
     build:
       context: ./  # or ./backend if Dockerfile is there
@@ -17,11 +24,16 @@ services:
     env_file:
       - ./local.env
     ports:
-      - "5000:80"  # match app container's default ASP.NET Core port
+      - "5000:80"  # exposes app externally
     environment:
       - ASPNETCORE_URLS=http://+:80
+      - MQTT_URI=mqtt://mqtt:1883  # <--- reference the mqtt service name!
+      - ConnectionStrings__PgDbConnection=Host=db;Username=testuser;Password=testpass;Database=database
+      - MQTT_BROKER=mqtt
     depends_on:
       - db
+      - mqtt
+
 
 
 volumes:

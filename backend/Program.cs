@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 
 var builder = WebApplication.CreateBuilder(args);
+//builder.Configuration.AddEnvironmentVariables();
 var connectionString = builder.Configuration.GetConnectionString("PgDbConnection");
 Console.WriteLine($"[DEBUG] Connection string: {connectionString}");
 builder.Services.AddDbContextFactory<MyDbContext>(options =>
@@ -26,6 +27,7 @@ app.MapControllers();
 
 // Setup Client options and instantiate
 var options = new HiveMQClientOptionsBuilder().
+    //.WithBroker(Environment.GetEnvironmentVariable("MQTT_BROKER") ?? "mqtt")
     WithBroker("host.docker.internal").
     WithPort(1883). 
     WithUseTls(false).//tls is turned off for testing locally, but i would have to change it to be on and figure out another way to work with it, once i send it to cloud probably
