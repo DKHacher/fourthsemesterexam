@@ -32,6 +32,7 @@ jobs:
           key: ${{ secrets.CLOUD_SSH_KEY }}
           script: |
             cd my-iot-app
+            cd backend
             
             # Export secrets into current shell so docker-compose can use them
             export POSTGRES_USER="${{ secrets.POSTGRES_USER }}"
