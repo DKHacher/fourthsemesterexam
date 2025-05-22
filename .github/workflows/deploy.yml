@@ -39,9 +39,9 @@ jobs:
             export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
             export POSTGRES_DB="${{ secrets.POSTGRES_DB }}"
             export MQTT_BROKER="${{ secrets.MQTT_BROKER }}"
-            export CLOUDINARY_CLOUD_NAME="${{ secrets.CLOUDINARY_CLOUDNAME }}"
-            export CLOUDINARY_API_KEY="${{ secrets.CLOUDINARY_APIKEY }}"
-            export CLOUDINARY_API_SECRET="${{ secrets.CLOUDINARY_APISECRET }}"
+            export CLOUDINARY_CLOUDNAME="${{ secrets.CLOUDINARY_CLOUDNAME }}"
+            export CLOUDINARY_APIKEY="${{ secrets.CLOUDINARY_APIKEY }}"
+            export CLOUDINARY_APISECRET="${{ secrets.CLOUDINARY_APISECRET }}"
             
             docker compose down || true
             docker compose up -d --build
