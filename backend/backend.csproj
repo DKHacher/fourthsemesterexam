@@ -9,6 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" />
       <PackageReference Include="CloudinaryDotNet" Version="1.11.0" />
       <PackageReference Include="HiveMQtt" Version="0.26.1" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.5" />

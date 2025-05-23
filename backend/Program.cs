@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 
 
+
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddDbContextFactory<MyDbContext>(options =>
@@ -18,6 +20,26 @@ builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection(
 builder.Services.AddScoped<CloudinaryService>();
 builder.Services.AddLogging();
 var app = builder.Build();
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.ToLowerInvariant();
+    string[] blockedPaths = {
+        "/info.php", "/.env", "/.git/config", "/config.json", "/telescope/requests", "/wp/v2/users/"
+    };
+
+    if (blockedPaths.Any(p => path.Contains(p)))
+    {
+        context.Response.StatusCode = 403;
+        await context.Response.WriteAsync("Forbidden");
+        return;
+    }
+
+    await next();
+});
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
+
 app.MapControllers();
 
 

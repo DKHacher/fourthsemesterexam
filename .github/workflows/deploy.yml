@@ -64,7 +64,11 @@ jobs:
             echo "Cloudinary__CloudName=${{ secrets.CLOUDINARY_CLOUDNAME }}" >> .env
             echo "Cloudinary__ApiKey=${{ secrets.CLOUDINARY_APIKEY }}" >> .env
             echo "Cloudinary__ApiSecret=${{ secrets.CLOUDINARY_APISECRET }}" >> .env
+            echo "TLS_CERT_B64=${{ secrets.TLS_CERT_B64 }}" >> .env
+            echo "TLS_KEY_B64=${{ secrets.TLS_KEY_B64 }}" >> .env
             echo "ConnectionStrings__PgDbConnection=Host=db;Username=${{ secrets.POSTGRES_USER }};Password=${{ secrets.POSTGRES_PASSWORD }};Database=${{ secrets.POSTGRES_DB }}" >> .env
+
+            chmod +x nginx/scripts/entrypoint.sh
 
             # Build and start containers
             docker compose -f docker-compose.yaml build --no-cache
