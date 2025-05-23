@@ -22,17 +22,10 @@ services:
     build:
       context: ./  # or ./backend if Dockerfile is there
       dockerfile: Dockerfile
-    #env_file:
-    #  - ./local.env
+    env_file:
+      - .env
     ports:
       - "5000:80"  # exposes app externally
-    environment:
-      - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__PgDbConnection=Host=db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=${POSTGRES_DB}
-      - MQTT_BROKER=mqtt
-      - Cloudinary__CloudName=${CLOUDINARY_CLOUDNAME}
-      - Cloudinary__ApiKey=${CLOUDINARY_APIKEY}
-      - Cloudinary__ApiSecret=${CLOUDINARY_APISECRET}
     depends_on:
       - db
       - mqtt

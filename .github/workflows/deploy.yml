@@ -65,15 +65,15 @@ jobs:
           script: |
             cd ~/my-iot-app/backend
             
-            cat > .env <<EOF
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-            MQTT_BROKER=${{ secrets.MQTT_BROKER }}
-            CLOUDINARY_CLOUDNAME=${{ secrets.CLOUDINARY_CLOUDNAME }}
-            CLOUDINARY_APIKEY=${{ secrets.CLOUDINARY_APIKEY }}
-            CLOUDINARY_APISECRET=${{ secrets.CLOUDINARY_APISECRET }}
-            EOF
+            echo "ASPNETCORE_URLS=http://+:80" > .env
+            echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> .env
+            echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
+            echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> .env
+            echo "MQTT_BROKER=${{ secrets.MQTT_BROKER }}" >> .env
+            echo "Cloudinary__CloudName=${{ secrets.CLOUDINARY_CLOUDNAME }}" >> .env
+            echo "Cloudinary__ApiKey=${{ secrets.CLOUDINARY_APIKEY }}" >> .env
+            echo "Cloudinary__ApiSecret=${{ secrets.CLOUDINARY_APISECRET }}" >> .env
+            echo "ConnectionStrings__PgDbConnection=Host=db;Username=${{ secrets.POSTGRES_USER }};Password=${{ secrets.POSTGRES_PASSWORD }};Database=${{ secrets.POSTGRES_DB }}" >> .env
 
             export POSTGRES_USER="${{ secrets.POSTGRES_USER }}"
             export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
