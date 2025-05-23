@@ -79,75 +79,77 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
         await Task.Delay(delayBetweenRetries);
     }
 }
-
-
-// Setup an application message handlers BEFORE subscribing to a topic
-client.OnMessageReceived += async (sender, args) =>
+if (!connected)
 {
-    using var scope = app.Services.CreateScope();
-    var storageService = scope.ServiceProvider.GetRequiredService<StorageService>();
-    var cloudinaryService = scope.ServiceProvider.GetRequiredService<CloudinaryService>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-    try
+    // Setup an application message handlers BEFORE subscribing to a topic
+    client.OnMessageReceived += async (sender, args) =>
     {
-        var rawPayload = args.PublishMessage.PayloadAsString;
-        var data = JsonSerializer.Deserialize<ReceivedData>(rawPayload);
+        using var scope = app.Services.CreateScope();
+        var storageService = scope.ServiceProvider.GetRequiredService<StorageService>();
+        var cloudinaryService = scope.ServiceProvider.GetRequiredService<CloudinaryService>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        // Decode base64 image
-        byte[] imageBytes = Convert.FromBase64String(data.Data);
-        using var imageStream = new MemoryStream(imageBytes);
+        try
+        {
+            var rawPayload = args.PublishMessage.PayloadAsString;
+            var data = JsonSerializer.Deserialize<ReceivedData>(rawPayload);
 
-        // Write bytes to a temporary file
-        var tempFilePath = Path.Combine(Path.GetTempPath(), $"{data.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg");
-        await File.WriteAllBytesAsync(tempFilePath, imageBytes);
+            // Decode base64 image
+            byte[] imageBytes = Convert.FromBase64String(data.Data);
+            using var imageStream = new MemoryStream(imageBytes);
 
-        // Upload from file path instead of stream
-        var publicId = await cloudinaryService.UploadPrivateImageAsync(
-            new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
-            $"{data.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg");
+            // Write bytes to a temporary file
+            var tempFilePath = Path.Combine(Path.GetTempPath(), $"{data.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg");
+            await File.WriteAllBytesAsync(tempFilePath, imageBytes);
 
-        // Clean up temp file after upload
-        File.Delete(tempFilePath);
+            // Upload from file path instead of stream
+            var publicId = await cloudinaryService.UploadPrivateImageAsync(
+                new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
+                $"{data.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg");
 
-        // Store metadata in DB
-        await storageService.StoreMetadataAsync(data.DeviceId, publicId);
+            // Clean up temp file after upload
+            File.Delete(tempFilePath);
 
-        logger.LogInformation($"Image uploaded and metadata stored for device {data.DeviceId}.");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Failed to handle incoming MQTT message.");
-    }
-};
+            // Store metadata in DB
+            await storageService.StoreMetadataAsync(data.DeviceId, publicId);
 
-// Configure the subscriptions we want and subscribe
-var subscribeOptionsBuilder = new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery));
-    
-var subscribeOptions = subscribeOptionsBuilder.Build();
-var subscribeResult = await client.SubscribeAsync(subscribeOptions);
-
-var imagePath = Path.Combine(AppContext.BaseDirectory, "ImageToTest.jpg");
-Console.WriteLine($"Trying to load image at: {imagePath}");
-Console.WriteLine($"File exists? {File.Exists(imagePath)}");
-
-if (!File.Exists(imagePath))
-{
-    Console.WriteLine($"Image not found at {imagePath}");
-}
-else
-{
-    byte[] imageBytes = await File.ReadAllBytesAsync(imagePath);
-    string base64Image = Convert.ToBase64String(imageBytes);
-
-    var testData = new ReceivedData()
-    {
-        Id = "0",
-        DeviceId = "test-device-001",
-        Data = base64Image
+            logger.LogInformation($"Image uploaded and metadata stored for device {data.DeviceId}.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to handle incoming MQTT message.");
+        }
     };
 
-    var publishResult = await client.PublishAsync("topic1", JsonSerializer.Serialize(testData));
-    Console.WriteLine($"Published test image to MQTT topic. Result: {publishResult.ReasonCode}");
+    // Configure the subscriptions we want and subscribe
+    var subscribeOptionsBuilder = new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery));
+        
+    var subscribeOptions = subscribeOptionsBuilder.Build();
+    var subscribeResult = await client.SubscribeAsync(subscribeOptions);
+
+    var imagePath = Path.Combine(AppContext.BaseDirectory, "ImageToTest.jpg");
+    Console.WriteLine($"Trying to load image at: {imagePath}");
+    Console.WriteLine($"File exists? {File.Exists(imagePath)}");
+
+    if (!File.Exists(imagePath))
+    {
+        Console.WriteLine($"Image not found at {imagePath}");
+    }
+    else
+    {
+        byte[] imageBytes = await File.ReadAllBytesAsync(imagePath);
+        string base64Image = Convert.ToBase64String(imageBytes);
+
+        var testData = new ReceivedData()
+        {
+            Id = "0",
+            DeviceId = "test-device-001",
+            Data = base64Image
+        };
+
+        var publishResult = await client.PublishAsync("topic1", JsonSerializer.Serialize(testData));
+        Console.WriteLine($"Published test image to MQTT topic. Result: {publishResult.ReasonCode}");
+    }
 }
+
 app.Run();
