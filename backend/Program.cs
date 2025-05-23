@@ -80,7 +80,7 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
         await Task.Delay(delayBetweenRetries);
     }
 }
-if (!connected)
+if (connected)
 {
     // Setup an application message handlers BEFORE subscribing to a topic
     client.OnMessageReceived += async (sender, args) =>
