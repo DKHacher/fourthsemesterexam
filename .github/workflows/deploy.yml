@@ -25,7 +25,7 @@ jobs:
           script: |
             cd ~/my-iot-app/backend
             # stops all containers
-            docker compose -f docker-compose.yaml down || true
+            docker compose -f docker-compose.yaml down --timeout 20 || true
             
             sleep 10
             # remove all containers currently not used as it would slow down the process but is left in in case of issues
