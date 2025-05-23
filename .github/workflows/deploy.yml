@@ -20,10 +20,12 @@ jobs:
           host: ${{ secrets.CLOUD_SERVER_IP }}
           username: ${{ secrets.CLOUD_USER }}
           key: ${{ secrets.CLOUD_SSH_KEY }}
+          debug: true
+          command_timeout: 300  
           script: |
             cd ~/my-iot-app/backend
             # stops all containers
-            docker compose -f docker-compose.yaml stop || true
+            docker compose -f docker-compose.yaml down || true
             
             sleep 10
             # remove all containers currently not used as it would slow down the process but is left in in case of issues
