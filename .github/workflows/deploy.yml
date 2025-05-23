@@ -57,6 +57,16 @@ jobs:
           key: ${{ secrets.CLOUD_SSH_KEY }}
           script: |
             cd ~/my-iot-app/backend
+            
+            cat > .env <<EOF
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            MQTT_BROKER=${{ secrets.MQTT_BROKER }}
+            CLOUDINARY_CLOUDNAME=${{ secrets.CLOUDINARY_CLOUDNAME }}
+            CLOUDINARY_APIKEY=${{ secrets.CLOUDINARY_APIKEY }}
+            CLOUDINARY_APISECRET=${{ secrets.CLOUDINARY_APISECRET }}
+            EOF
 
             export POSTGRES_USER="${{ secrets.POSTGRES_USER }}"
             export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
