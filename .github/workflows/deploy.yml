@@ -36,7 +36,7 @@ jobs:
             docker network prune -f || true
 
       - name: Copy project files to server
-        uses: appleboy/scp-action@0.1.7
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.CLOUD_SERVER_IP }}
           username: ${{ secrets.CLOUD_USER }}
@@ -46,7 +46,7 @@ jobs:
           rm: true
 
       - name: SSH and deploy
-        uses: appleboy/ssh-action@0.1.7
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.CLOUD_SERVER_IP }}
           username: ${{ secrets.CLOUD_USER }}
@@ -86,6 +86,8 @@ jobs:
             if [ -n "$APP_CONTAINER" ]; then
               echo "==== Environment variables inside app container ===="
               docker exec "$APP_CONTAINER" env | grep -E 'POSTGRES|MQTT|CLOUDINARY'
+              echo "==== Logs from app container ===="
+              docker compose -f docker-compose.yaml logs app
             else
               echo "App container not found"
             fi
