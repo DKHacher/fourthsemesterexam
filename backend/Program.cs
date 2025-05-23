@@ -75,7 +75,6 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
         if (attempt == maxRetries)
         {
             Console.WriteLine("Failed to connect to MQTT after multiple attempts. Exiting.");
-            throw;
         }
         await Task.Delay(delayBetweenRetries);
     }
