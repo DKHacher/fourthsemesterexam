@@ -50,7 +50,7 @@ var options = new HiveMQClientOptionsBuilder().
     WithBroker(Environment.GetEnvironmentVariable("MQTT_BROKER") ?? "mqtt").
     //WithBroker("host.docker.internal").
     WithPort(1883). 
-    WithUseTls(true).//tls is turned off for testing locally, but i would have to change it to be on and figure out another way to work with it, once i send it to cloud probably
+    WithUseTls(false).//tls is turned off for testing locally, but i would have to change it to be on and figure out another way to work with it, once i send it to cloud probably
     Build();
 
 
