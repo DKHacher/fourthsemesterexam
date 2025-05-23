@@ -24,6 +24,8 @@ jobs:
           command_timeout: 120s  
           script: |
             cd ~/my-iot-app/backend
+            docker info
+            docker ps -a
             # stops all containers
             docker compose -f docker-compose.yaml down --timeout 20 || true
             
