@@ -55,8 +55,8 @@ var options = new HiveMQClientOptionsBuilder().
 
 
 HiveMQClient client = null;
-int maxRetries = 10;
-TimeSpan delayBetweenRetries = TimeSpan.FromSeconds(3);
+int maxRetries = 20;
+TimeSpan delayBetweenRetries = TimeSpan.FromSeconds(9);
 bool connected = false;
 
 for (int attempt = 1; attempt <= maxRetries; attempt++)
@@ -71,7 +71,8 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
     }
     catch (HiveMQtt.Client.Exceptions.HiveMQttClientException ex)
     {
-        Console.WriteLine($"MQTT connection attempt {attempt} failed: {ex.Message}");
+        Console.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] MQTT connection attempt {attempt} failed: {ex.Message}");
+
         if (attempt == maxRetries)
         {
             Console.WriteLine("Failed to connect to MQTT after multiple attempts. Exiting.");
