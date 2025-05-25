@@ -105,9 +105,10 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
 }
 if (connected)
 {
-    Dictionary<string, List<byte[]>> chunkStorage = new();
+    // Nested dictionary: deviceId -> imageId -> list of chunks
+    Dictionary<string, Dictionary<string, List<byte[]>>> chunkStorage = new();
     object chunkLock = new();  // for thread safety
-    // Setup an application message handlers BEFORE subscribing to a topic
+
     client.OnMessageReceived += async (sender, args) =>
     {
         using var scope = app.Services.CreateScope();
@@ -117,14 +118,37 @@ if (connected)
 
         string topic = args.PublishMessage.Topic;
         byte[] payload = args.PublishMessage.Payload;
-        string deviceId = "esp32-cam-001";  // Update if your ESP sends an ID
 
-        bool isDoneMessage = false;
-        byte[] fullImage = null;
+        string deviceId = "esp32-cam-001";
 
-        lock (chunkLock)
+        // Store metadata per device
+        Dictionary<string, string> imageIdMap = new();
+        Dictionary<string, List<byte[]>> chunkStorage = new();
+        object chunkLock = new();
+
+        if (topic == "topic1/meta")
         {
-            if (topic.StartsWith("topic1/chunk/"))
+            try
+            {
+                var json = JsonSerializer.Deserialize<JsonElement>(payload);
+                string metaDeviceId = json.GetProperty("deviceId").GetString();
+                string imageId = json.GetProperty("imageId").GetString();
+
+                lock (chunkLock)
+                {
+                    imageIdMap[metaDeviceId] = imageId;
+                }
+
+                logger.LogInformation($"Received metadata: deviceId={metaDeviceId}, imageId={imageId}");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to parse meta message.");
+            }
+        }
+        else if (topic.StartsWith("topic1/chunk/"))
+        {
+            lock (chunkLock)
             {
                 if (!chunkStorage.ContainsKey(deviceId))
                 {
@@ -132,47 +156,59 @@ if (connected)
                 }
 
                 chunkStorage[deviceId].Add(payload);
-                logger.LogInformation($"Received chunk for {deviceId}, total chunks so far: {chunkStorage[deviceId].Count}");
+                logger.LogInformation($"Received chunk for {deviceId}, total: {chunkStorage[deviceId].Count}");
             }
-            else if (topic == "topic1/done")
+        }
+        else if (topic == "topic1/done")
+        {
+            byte[] fullImage = null;
+            string imageId = null;
+
+            lock (chunkLock)
             {
                 if (chunkStorage.TryGetValue(deviceId, out var chunks))
                 {
                     fullImage = chunks.SelectMany(c => c).ToArray();
                     chunkStorage.Remove(deviceId);
-                    isDoneMessage = true;
                 }
                 else
                 {
-                    logger.LogWarning($"Received DONE message but no chunks found for device {deviceId}.");
+                    logger.LogWarning($"Received DONE but no chunks for {deviceId}.");
+                    return;
+                }
+
+                imageIdMap.TryGetValue(deviceId, out imageId);
+                imageIdMap.Remove(deviceId);
+            }
+
+            if (fullImage != null && imageId != null)
+            {
+                try
+                {
+                    var filename = $"{deviceId}_{imageId}.jpg";
+                    var tempFilePath = Path.Combine(Path.GetTempPath(), filename);
+
+                    await File.WriteAllBytesAsync(tempFilePath, fullImage);
+
+                    var publicId = await cloudinaryService.UploadPrivateImageAsync(
+                        new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
+                        filename);
+
+                    File.Delete(tempFilePath);
+
+                    await storageService.StoreMetadataAsync(deviceId, publicId);
+
+                    logger.LogInformation($"Image uploaded and metadata stored: {filename}");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to process complete image.");
                 }
             }
         }
-
-        // This runs outside the lock
-        if (isDoneMessage && fullImage != null)
+        else
         {
-            try
-            {
-                var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                var tempFilePath = Path.Combine(Path.GetTempPath(), $"{deviceId}_{timestamp}.jpg");
-
-                await File.WriteAllBytesAsync(tempFilePath, fullImage);
-
-                var publicId = await cloudinaryService.UploadPrivateImageAsync(
-                    new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
-                    $"{deviceId}_{timestamp}.jpg");
-
-                File.Delete(tempFilePath);
-
-                await storageService.StoreMetadataAsync(deviceId, publicId);
-
-                logger.LogInformation($"Image uploaded and metadata stored for {deviceId}.");
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to process complete image.");
-            }
+            logger.LogWarning($"Unknown topic received: {topic}");
         }
     };
 }
@@ -180,8 +216,10 @@ if (connected)
 
     // Configure the subscriptions we want and subscribe
     var subscribeOptionsBuilder = new SubscribeOptionsBuilder()
-        .WithSubscription(new TopicFilter("topic1/chunk/+", QualityOfService.ExactlyOnceDelivery))
-        .WithSubscription(new TopicFilter("topic1/done", QualityOfService.ExactlyOnceDelivery));
+        .WithSubscription(new TopicFilter("topic1/meta", QualityOfService.ExactlyOnceDelivery))
+        .WithSubscription(new TopicFilter("topic1/chunk/+/+/+", QualityOfService.ExactlyOnceDelivery))
+        .WithSubscription(new TopicFilter("topic1/done/+/+", QualityOfService.ExactlyOnceDelivery));
+
 
         
     var subscribeOptions = subscribeOptionsBuilder.Build();
