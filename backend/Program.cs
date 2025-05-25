@@ -115,29 +115,29 @@ if (connected)
 
         try
         {
-            var rawPayload = args.PublishMessage.PayloadAsString;
-            var data = JsonSerializer.Deserialize<ReceivedData>(rawPayload);
+            // Get binary image data directly
+            byte[] imageBytes = args.PublishMessage.Payload;
 
-            // Decode base64 image
-            byte[] imageBytes = Convert.FromBase64String(data.Data);
-            using var imageStream = new MemoryStream(imageBytes);
+            // Optional: create unique ID or device name here
+            var deviceId = "esp32-cam-001"; // Replace with actual device ID if available
 
-            // Write bytes to a temporary file
-            var tempFilePath = Path.Combine(Path.GetTempPath(), $"{data.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg");
+            // Write bytes to temp file
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            var tempFilePath = Path.Combine(Path.GetTempPath(), $"{deviceId}_{timestamp}.jpg");
+
             await File.WriteAllBytesAsync(tempFilePath, imageBytes);
 
-            // Upload from file path instead of stream
+            // Upload image to Cloudinary
             var publicId = await cloudinaryService.UploadPrivateImageAsync(
                 new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
-                $"{data.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg");
+                $"{deviceId}_{timestamp}.jpg");
 
-            // Clean up temp file after upload
             File.Delete(tempFilePath);
 
-            // Store metadata in DB
-            await storageService.StoreMetadataAsync(data.DeviceId, publicId);
+            // Store metadata
+            await storageService.StoreMetadataAsync(deviceId, publicId);
 
-            logger.LogInformation($"Image uploaded and metadata stored for device {data.DeviceId}.");
+            logger.LogInformation($"Image uploaded and metadata stored for device {deviceId}.");
         }
         catch (Exception ex)
         {
