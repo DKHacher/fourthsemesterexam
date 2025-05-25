@@ -105,6 +105,8 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
 }
 if (connected)
 {
+    Dictionary<string, List<byte[]>> chunkStorage = new();
+    object chunkLock = new();  // for thread safety
     // Setup an application message handlers BEFORE subscribing to a topic
     client.OnMessageReceived += async (sender, args) =>
     {
@@ -113,40 +115,74 @@ if (connected)
         var cloudinaryService = scope.ServiceProvider.GetRequiredService<CloudinaryService>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        try
+        string topic = args.PublishMessage.Topic;
+        byte[] payload = args.PublishMessage.Payload;
+        string deviceId = "esp32-cam-001";  // Update if your ESP sends an ID
+
+        bool isDoneMessage = false;
+        byte[] fullImage = null;
+
+        lock (chunkLock)
         {
-            // Get binary image data directly
-            byte[] imageBytes = args.PublishMessage.Payload;
+            if (topic.StartsWith("topic1/chunk/"))
+            {
+                if (!chunkStorage.ContainsKey(deviceId))
+                {
+                    chunkStorage[deviceId] = new List<byte[]>();
+                }
 
-            // Optional: create unique ID or device name here
-            var deviceId = "esp32-cam-001"; // Replace with actual device ID if available
-
-            // Write bytes to temp file
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-            var tempFilePath = Path.Combine(Path.GetTempPath(), $"{deviceId}_{timestamp}.jpg");
-
-            await File.WriteAllBytesAsync(tempFilePath, imageBytes);
-
-            // Upload image to Cloudinary
-            var publicId = await cloudinaryService.UploadPrivateImageAsync(
-                new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
-                $"{deviceId}_{timestamp}.jpg");
-
-            File.Delete(tempFilePath);
-
-            // Store metadata
-            await storageService.StoreMetadataAsync(deviceId, publicId);
-
-            logger.LogInformation($"Image uploaded and metadata stored for device {deviceId}.");
+                chunkStorage[deviceId].Add(payload);
+                logger.LogInformation($"Received chunk for {deviceId}, total chunks so far: {chunkStorage[deviceId].Count}");
+            }
+            else if (topic == "topic1/done")
+            {
+                if (chunkStorage.TryGetValue(deviceId, out var chunks))
+                {
+                    fullImage = chunks.SelectMany(c => c).ToArray();
+                    chunkStorage.Remove(deviceId);
+                    isDoneMessage = true;
+                }
+                else
+                {
+                    logger.LogWarning($"Received DONE message but no chunks found for device {deviceId}.");
+                }
+            }
         }
-        catch (Exception ex)
+
+        // This runs outside the lock
+        if (isDoneMessage && fullImage != null)
         {
-            logger.LogError(ex, "Failed to handle incoming MQTT message.");
+            try
+            {
+                var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                var tempFilePath = Path.Combine(Path.GetTempPath(), $"{deviceId}_{timestamp}.jpg");
+
+                await File.WriteAllBytesAsync(tempFilePath, fullImage);
+
+                var publicId = await cloudinaryService.UploadPrivateImageAsync(
+                    new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
+                    $"{deviceId}_{timestamp}.jpg");
+
+                File.Delete(tempFilePath);
+
+                await storageService.StoreMetadataAsync(deviceId, publicId);
+
+                logger.LogInformation($"Image uploaded and metadata stored for {deviceId}.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to process complete image.");
+            }
         }
     };
+}
+
 
     // Configure the subscriptions we want and subscribe
-    var subscribeOptionsBuilder = new SubscribeOptionsBuilder().WithSubscription(new TopicFilter("topic1", QualityOfService.ExactlyOnceDelivery));
+    var subscribeOptionsBuilder = new SubscribeOptionsBuilder()
+        .WithSubscription(new TopicFilter("topic1/chunk/+", QualityOfService.ExactlyOnceDelivery))
+        .WithSubscription(new TopicFilter("topic1/done", QualityOfService.ExactlyOnceDelivery));
+
         
     var subscribeOptions = subscribeOptionsBuilder.Build();
     var subscribeResult = await client.SubscribeAsync(subscribeOptions);
@@ -174,6 +210,5 @@ if (connected)
         var publishResult = await client.PublishAsync("topic1", JsonSerializer.Serialize(testData));
         Console.WriteLine($"Published test image to MQTT topic. Result: {publishResult.ReasonCode}");
     }*/
-}
 
 app.Run();
