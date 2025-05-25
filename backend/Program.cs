@@ -151,7 +151,7 @@ if (connected)
     var subscribeOptions = subscribeOptionsBuilder.Build();
     var subscribeResult = await client.SubscribeAsync(subscribeOptions);
 
-    var imagePath = Path.Combine(AppContext.BaseDirectory, "ImageToTest.jpg");
+    /*var imagePath = Path.Combine(AppContext.BaseDirectory, "ImageToTest.jpg");
     Console.WriteLine($"Trying to load image at: {imagePath}");
     Console.WriteLine($"File exists? {File.Exists(imagePath)}");
 
@@ -173,7 +173,7 @@ if (connected)
 
         var publishResult = await client.PublishAsync("topic1", JsonSerializer.Serialize(testData));
         Console.WriteLine($"Published test image to MQTT topic. Result: {publishResult.ReasonCode}");
-    }
+    }*/
 }
 
 app.Run();
