@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using backend;
 using backend.Context;
+using backend.Entities;
 using HiveMQtt.Client;
 using HiveMQtt.MQTT5.Types;
 using Microsoft.EntityFrameworkCore;
@@ -99,12 +100,12 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
         await Task.Delay(delayBetweenRetries);
     }
 }
+Dictionary<string, ChunkMeta> chunkMetadataMap = new();
+Dictionary<string, SortedDictionary<int, byte[]>> orderedChunkStorage = new();
+object chunkLock = new();
+
 if (connected)
 {
-    // Nested dictionary: deviceId -> imageId -> list of chunks
-    Dictionary<string, Dictionary<string, List<byte[]>>> chunkStorage = new();
-    object chunkLock = new();  // for thread safety
-
     client.OnMessageReceived += async (sender, args) =>
     {
         using var scope = app.Services.CreateScope();
@@ -115,13 +116,6 @@ if (connected)
         string topic = args.PublishMessage.Topic;
         byte[] payload = args.PublishMessage.Payload;
 
-        string deviceId = "esp32-cam-001";
-
-        // Store metadata per device
-        Dictionary<string, string> imageIdMap = new();
-        Dictionary<string, List<byte[]>> chunkStorage = new();
-        object chunkLock = new();
-
         if (topic == "topic1/meta")
         {
             try
@@ -129,13 +123,14 @@ if (connected)
                 var json = JsonSerializer.Deserialize<JsonElement>(payload);
                 string metaDeviceId = json.GetProperty("deviceId").GetString();
                 string imageId = json.GetProperty("imageId").GetString();
+                int totalChunks = json.GetProperty("totalChunks").GetInt32();
 
                 lock (chunkLock)
                 {
-                    imageIdMap[metaDeviceId] = imageId;
+                    chunkMetadataMap[metaDeviceId] = new ChunkMeta(imageId, totalChunks);
                 }
 
-                logger.LogInformation($"Received metadata: deviceId={metaDeviceId}, imageId={imageId}");
+                logger.LogInformation($"Received metadata: deviceId={metaDeviceId}, imageId={imageId}, totalChunks={totalChunks}");
             }
             catch (Exception ex)
             {
@@ -144,72 +139,107 @@ if (connected)
         }
         else if (topic.StartsWith("topic1/chunk/"))
         {
-            lock (chunkLock)
+            var parts = topic.Split('/');
+            if (parts.Length >= 5)
             {
-                if (!chunkStorage.ContainsKey(deviceId))
+                string deviceIdFromTopic = parts[2];
+                string imageIdFromTopic = parts[3];
+                if (!int.TryParse(parts[4], out int chunkIndex))
                 {
-                    chunkStorage[deviceId] = new List<byte[]>();
-                }
-                try
-                {
-                    string base64 = System.Text.Encoding.UTF8.GetString(payload);
-                    byte[] decoded = Convert.FromBase64String(base64);
-                    chunkStorage[deviceId].Add(decoded);
-                    logger.LogInformation($"Received and decoded chunk for {deviceId}, total: {chunkStorage[deviceId].Count}");
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Failed to decode base64 chunk.");
-                }
-
-                logger.LogInformation($"Received chunk for {deviceId}, total: {chunkStorage[deviceId].Count}");
-            }
-        }
-        else if (topic == "topic1/done")
-        {
-            byte[] fullImage = null;
-            string imageId = null;
-
-            lock (chunkLock)
-            {
-                if (chunkStorage.TryGetValue(deviceId, out var chunks))
-                {
-                    fullImage = chunks.SelectMany(c => c).ToArray();
-                    chunkStorage.Remove(deviceId);
-                }
-                else
-                {
-                    logger.LogWarning($"Received DONE but no chunks for {deviceId}.");
+                    logger.LogWarning($"Invalid chunk index in topic: {topic}");
                     return;
                 }
 
-                imageIdMap.TryGetValue(deviceId, out imageId);
-                imageIdMap.Remove(deviceId);
+                lock (chunkLock)
+                {
+                    if (!orderedChunkStorage.ContainsKey(deviceIdFromTopic))
+                        orderedChunkStorage[deviceIdFromTopic] = new SortedDictionary<int, byte[]>();
+
+                    try
+                    {
+                        string base64 = System.Text.Encoding.UTF8.GetString(payload);
+                        byte[] decoded = Convert.FromBase64String(base64);
+                        orderedChunkStorage[deviceIdFromTopic][chunkIndex] = decoded;
+
+                        logger.LogInformation($"Received chunk {chunkIndex} for {deviceIdFromTopic} (stored chunks: {orderedChunkStorage[deviceIdFromTopic].Count})");
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to decode base64 chunk.");
+                    }
+                }
             }
-
-            if (fullImage != null && imageId != null)
+            else
             {
-                try
+                logger.LogWarning($"Unexpected topic format for chunk: {topic}");
+            }
+        }
+        else if (topic.StartsWith("topic1/done/"))
+        {
+            var parts = topic.Split('/');
+            if (parts.Length >= 4)
+            {
+                string deviceIdFromTopic = parts[2];
+                string imageIdFromTopic = parts[3];
+
+                byte[] fullImage = null;
+
+                lock (chunkLock)
                 {
-                    var filename = $"{deviceId}_{imageId}.jpg";
-                    var tempFilePath = Path.Combine(Path.GetTempPath(), filename);
+                    if (!chunkMetadataMap.TryGetValue(deviceIdFromTopic, out var meta))
+                    {
+                        logger.LogWarning($"Done received but no metadata found for device {deviceIdFromTopic}");
+                        return;
+                    }
 
-                    await File.WriteAllBytesAsync(tempFilePath, fullImage);
+                    if (!orderedChunkStorage.TryGetValue(deviceIdFromTopic, out var chunkMap))
+                    {
+                        logger.LogWarning($"Done received but no chunks found for device {deviceIdFromTopic}");
+                        return;
+                    }
 
-                    var publicId = await cloudinaryService.UploadPrivateImageAsync(
-                        new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
-                        filename);
+                    if (chunkMap.Count != meta.TotalChunks)
+                    {
+                        logger.LogWarning($"Chunks incomplete for device {deviceIdFromTopic}: have {chunkMap.Count}, expected {meta.TotalChunks}");
+                        return;
+                    }
 
-                    File.Delete(tempFilePath);
+                    // Combine chunks in order
+                    fullImage = chunkMap.Values.SelectMany(c => c).ToArray();
 
-                    await storageService.StoreMetadataAsync(deviceId, publicId);
-
-                    logger.LogInformation($"Image uploaded and metadata stored: {filename}");
+                    // Cleanup
+                    orderedChunkStorage.Remove(deviceIdFromTopic);
+                    chunkMetadataMap.Remove(deviceIdFromTopic);
                 }
-                catch (Exception ex)
+
+                if (fullImage != null)
                 {
-                    logger.LogError(ex, "Failed to process complete image.");
+                    try
+                    {
+                        var filename = $"{deviceIdFromTopic}_{imageIdFromTopic}.jpg";
+                        var tempFilePath = Path.Combine(Path.GetTempPath(), filename);
+
+                        await File.WriteAllBytesAsync(tempFilePath, fullImage);
+
+                        var publicId = await cloudinaryService.UploadPrivateImageAsync(
+                            new FileStream(tempFilePath, FileMode.Open, FileAccess.Read),
+                            filename);
+
+                        File.Delete(tempFilePath);
+
+                        await storageService.StoreMetadataAsync(deviceIdFromTopic, publicId);
+
+                        logger.LogInformation($"Image uploaded and metadata stored: {filename}");
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to process complete image.");
+                    }
                 }
+            }
+            else
+            {
+                logger.LogWarning($"Invalid done topic format: {topic}");
             }
         }
         else
@@ -220,11 +250,12 @@ if (connected)
 }
 
 
+
     // Configure the subscriptions
     var subscribeOptionsBuilder = new SubscribeOptionsBuilder()
         .WithSubscription(new TopicFilter("topic1/meta", QualityOfService.ExactlyOnceDelivery))
-        .WithSubscription(new TopicFilter("topic1/chunk/+/+/+", QualityOfService.ExactlyOnceDelivery))
-        .WithSubscription(new TopicFilter("topic1/done/+/+", QualityOfService.ExactlyOnceDelivery));
+        .WithSubscription(new TopicFilter("topic1/chunk/#", QualityOfService.ExactlyOnceDelivery))
+        .WithSubscription(new TopicFilter("topic1/done/#", QualityOfService.ExactlyOnceDelivery));
 
 
         
