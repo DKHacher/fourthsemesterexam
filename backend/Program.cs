@@ -150,8 +150,18 @@ if (connected)
                 {
                     chunkStorage[deviceId] = new List<byte[]>();
                 }
+                try
+                {
+                    string base64 = System.Text.Encoding.UTF8.GetString(payload);
+                    byte[] decoded = Convert.FromBase64String(base64);
+                    chunkStorage[deviceId].Add(decoded);
+                    logger.LogInformation($"Received and decoded chunk for {deviceId}, total: {chunkStorage[deviceId].Count}");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to decode base64 chunk.");
+                }
 
-                chunkStorage[deviceId].Add(payload);
                 logger.LogInformation($"Received chunk for {deviceId}, total: {chunkStorage[deviceId].Count}");
             }
         }
