@@ -5,10 +5,6 @@ using HiveMQtt.Client;
 using HiveMQtt.MQTT5.Types;
 using Microsoft.EntityFrameworkCore;
 
-
-
-
-
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddDbContextFactory<MyDbContext>(options =>
@@ -70,9 +66,9 @@ for (int i = 0; i < retries; i++)
 // Setup Client options and instantiate
 var options = new HiveMQClientOptionsBuilder().
     WithBroker("mqtt").
-    //WithBroker("host.docker.internal").
+    //WithBroker("host.docker.internal"). //this is to test the mqtt functions locally
     WithPort(1883). 
-    WithUseTls(false).//tls is turned off for testing locally, but i would have to change it to be on and figure out another way to work with it, once i send it to cloud probably
+    WithUseTls(false).
     Build();
 
 
@@ -214,7 +210,7 @@ if (connected)
 }
 
 
-    // Configure the subscriptions we want and subscribe
+    // Configure the subscriptions
     var subscribeOptionsBuilder = new SubscribeOptionsBuilder()
         .WithSubscription(new TopicFilter("topic1/meta", QualityOfService.ExactlyOnceDelivery))
         .WithSubscription(new TopicFilter("topic1/chunk/+/+/+", QualityOfService.ExactlyOnceDelivery))
@@ -224,7 +220,7 @@ if (connected)
         
     var subscribeOptions = subscribeOptionsBuilder.Build();
     var subscribeResult = await client.SubscribeAsync(subscribeOptions);
-
+    //commented out method for the backend to test the mqtt connection and the services included in saving images, before i started to chop images up into many pieces when sending them
     /*var imagePath = Path.Combine(AppContext.BaseDirectory, "ImageToTest.jpg");
     Console.WriteLine($"Trying to load image at: {imagePath}");
     Console.WriteLine($"File exists? {File.Exists(imagePath)}");

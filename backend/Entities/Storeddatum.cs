@@ -7,8 +7,8 @@ namespace backend.Entities;
 
 public partial class Storeddatum
 {
-    [Key] // ← ensures EF recognizes it as the primary key
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)] // ← ensures it's auto-generated
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)] 
     public string Id { get; set; } = null!;
 
     public string? Deviceid { get; set; }
